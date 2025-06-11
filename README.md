@@ -1,8 +1,9 @@
-# joplin_weviate_ollama_telegram
-
-**JOPLIN PRIVATE AI - RAG YOUR NOTES LOCALLY USING OPEN SOURCE MODELS**
+# JOPLIN PRIVATE AI
+## RAG Your Notes Locally Using Open Source Models
 
 *(Joplin Notes to Weaviate Ollama RAG pipeline with optional Telegram client)*
+
+---
 
 
 This program syncs your Joplin notes and resources into Weaviate,
