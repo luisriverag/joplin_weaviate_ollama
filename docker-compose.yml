@@ -1,0 +1,27 @@
+version: "3.9"
+
+services:
+  weaviate:
+    image: semitechnologies/weaviate:1.24.10
+    restart: unless-stopped
+    ports:
+      - "8080:8080"      # REST API
+      - "50051:50051"    # gRPC
+    environment:
+      QUERY_DEFAULTS_LIMIT: 25
+      AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED: "true"
+      PERSISTENCE_DATA_PATH: "/var/lib/weaviate"
+      DEFAULT_VECTORIZER_MODULE: "none"
+      ENABLE_MODULES: ""
+      ENABLE_TELEMETRY: "false"
+
+      # single-node raft settings
+      CLUSTER_HOSTNAME: "node1"      # stays identical across restarts
+      RAFT_BOOTSTRAP_EXPECT: "1"
+
+      # **use only for the first boot** if you need to heal “phantom shard”
+      # errors; delete (or set to "false") afterwards
+      # RAFT_ENABLE_ONE_NODE_RECOVERY: "true"
+
+    volumes:
+      - /home/ubuntu/docker/weaviate-data:/var/lib/weaviate

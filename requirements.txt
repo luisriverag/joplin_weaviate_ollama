@@ -1,0 +1,26 @@
+# Environment
+python-dotenv
+
+# OCR & Image
+pytesseract
+pillow
+
+# PDF & HTML parsing
+pypdf
+PyMuPDF
+
+# Vector DB
+weaviate-client>=4.0.0    # v4 client (needs gRPC port open)
+
+# Embeddings & LangChain integrations
+sentence-transformers
+langchain>=0.2.0
+langchain-core
+langchain-huggingface
+langchain-weaviate
+langchain-ollama
+
+# Compatibility
+pydantic<3
+
+python-telegram-bot
