@@ -1,113 +1,117 @@
 #!/usr/bin/env python3
-
 import os
-from urllib.parse import urlparse
-from dotenv import load_dotenv
 import logging
-
-import weaviate
-from weaviate.classes.init import AdditionalConfig, Timeout
-
-from langchain_weaviate import WeaviateVectorStore
-from langchain_huggingface import HuggingFaceEmbeddings
-from langchain_ollama import OllamaLLM
-from langchain.chains import RetrievalQA
+from dotenv import load_dotenv
 
 from telegram import Update
-from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes
+from telegram.ext import (
+    ApplicationBuilder,
+    CommandHandler,
+    MessageHandler,
+    ContextTypes,
+    filters,
+)
 
-# ── Config ─────────────────────────────────────────────────────
+from rag_query import GenericRAG  # ⬅️ imports the improved RAG system
+
+# ── Configuration ──────────────────────────────────────────────
 load_dotenv()
 
-BOT_TOKEN      = os.getenv("TELEGRAM_BOT_TOKEN")
-ALLOWED_USERID = int(os.getenv("TELEGRAM_USER_ID", "0"))
+BOT_TOKEN: str | None = os.getenv("TELEGRAM_BOT_TOKEN")
+ALLOWED_USERID: int = int(os.getenv("TELEGRAM_USER_ID", "0"))
+CLASSIFIER_CONFIG: str | None = os.getenv("CLASSIFIER_CONFIG")  # JSON file with custom document patterns
 
-WEAVIATE_URL   = os.getenv("WEAVIATE_URL", "http://localhost:8080")
-WEAVIATE_INDEX = os.getenv("WEAVIATE_INDEX", "Note")
-EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "sentence-transformers/all-MiniLM-L6-v2")
-OLLAMA_MODEL    = os.getenv("OLLAMA_MODEL", "llama3:8b")
+if not BOT_TOKEN:
+    raise RuntimeError("TELEGRAM_BOT_TOKEN is not set in the environment")
 
-
-# ── Weaviate client factory ────────────────────────────────────
-def make_weaviate_client(url: str) -> weaviate.WeaviateClient:
-    parsed = urlparse(url)
-    host = parsed.hostname or "localhost"
-    port = parsed.port or (443 if parsed.scheme == "https" else 8080)
-    secure = parsed.scheme == "https"
-
-    if host in {"localhost", "127.0.0.1"}:
-        return weaviate.connect_to_local(
-            host=host,
-            port=port,
-            grpc_port=50051,
-            additional_config=AdditionalConfig(timeout=Timeout(init=5)),
-        )
-    else:
-        return weaviate.connect_to_custom(
-            http_host=host,
-            http_port=port,
-            http_secure=secure,
-            grpc_host=host,
-            grpc_port=50051,
-            grpc_secure=secure,
-            additional_config=AdditionalConfig(timeout=Timeout(init=5)),
-        )
-
-
-# ── LangChain setup ────────────────────────────────────────────
-client = make_weaviate_client(WEAVIATE_URL)
-assert client.is_ready(), "❌ Weaviate connection failed"
-
-embedder = HuggingFaceEmbeddings(model_name=EMBEDDING_MODEL)
-vectorstore = WeaviateVectorStore(
-    client=client,
-    index_name=WEAVIATE_INDEX,
-    text_key="text",
-    embedding=embedder,
+# Logging setup
+logging.basicConfig(
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    level=logging.INFO,
 )
-llm = OllamaLLM(model=OLLAMA_MODEL)
+logger = logging.getLogger("TelegramRAGBot")
 
-qa_chain = RetrievalQA.from_chain_type(
-    llm=llm,
-    retriever=vectorstore.as_retriever(),
-)
+# ── RAG System ────────────────────────────────────────────────
+rag = GenericRAG(config_path=CLASSIFIER_CONFIG)
 
-
-# ── Bot handlers ───────────────────────────────────────────────
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+# ── Bot handlers ──────────────────────────────────────────────
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """/start command handler"""
     if update.effective_user.id != ALLOWED_USERID:
-        return
-    await update.message.reply_text("🧠 Hello! Ask me anything from your notes.")
+        return  # Ignore strangers
+
+    await update.message.reply_text(
+        "🧠 Hi! I'm your personal knowledge‑base assistant.\n"
+        "Send me any question.\n\n"
+        "• Prefix with *no-analysis:* to skip document analysis.\n"
+        "• Prefix with *debug:* to see a detailed breakdown of the top retrieved files.\n",
+        parse_mode="Markdown",
+    )
 
 
-async def handle_query(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    print(f"📥 Received message from {update.effective_user.id}: {update.message.text}")
-    
-    if update.effective_user.id != ALLOWED_USERID:
-        print("❌ Unauthorized user. Ignoring.")
+async def handle_query(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Main message handler"""
+    user_id = update.effective_user.id
+    message  = update.message.text or ""
+    query = message.strip()
+
+    logger.info("📥 Message from %s: %s", user_id, query)
+
+    if user_id != ALLOWED_USERID:
+        logger.warning("❌ Unauthorized user %s – ignoring", user_id)
         return
 
-    query = update.message.text.strip()
     if not query:
-        return
+        return  # Empty message
 
     try:
-        answer = qa_chain.invoke(query)
-        await update.message.reply_text(f"📝 {answer['result'].strip()}")
-    except Exception as e:
-        print("⚠️ Error during query:", e)
-        await update.message.reply_text("⚠️ Sorry, I couldn't process that.")
+        # Command-style prefixes -------------------------------------------------
+        lowered = query.lower()
+
+        if lowered.startswith("no-analysis:"):
+            actual_query = query[12:].strip()
+            answer = rag.query_with_analysis(actual_query, show_analysis=False)
+            await update.message.reply_text(f"📝 {answer}")
+            return
+
+        if lowered.startswith("debug:"):
+            actual_query = query[6:].strip()
+            analysis = rag.analyze_retrieved_docs(actual_query)
+
+            lines: list[str] = [
+                f"🔍 Debug Analysis for '{actual_query}':",
+                f"• Total documents retrieved: {analysis['total_docs']}",
+            ]
+
+            for i, cls in enumerate(analysis["classifications"][:5], 1):
+                lines.append(f"{i}. {cls['title'] or 'Untitled'}")
+                lines.append(f"   Type: {cls['classification']['type']}")
+                lines.append(f"   Confidence: {cls['classification']['confidence']:.2f}")
+                indicators = ", ".join(cls['classification']['indicators']) or "general match"
+                lines.append(f"   Indicators: {indicators}")
+
+            await update.message.reply_text("\n".join(lines))
+            return
+
+        # Default behaviour ------------------------------------------------------
+        answer = rag.query_with_analysis(query)
+        await update.message.reply_text(f"📝 {answer}")
+
+    except Exception as exc:  # pylint: disable=broad-except
+        logger.exception("⚠️ Error while processing query: %s", exc)
+        await update.message.reply_text("⚠️ Sorry, something went wrong while processing your question.")
 
 
+# ── Bot application setup ─────────────────────────────────────
 
-# ── App init ───────────────────────────────────────────────────
-def main():
+def main() -> None:
+    """Starts the Telegram bot and enters polling loop"""
     application = ApplicationBuilder().token(BOT_TOKEN).build()
 
     application.add_handler(CommandHandler("start", start))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_query))
 
-    print("🤖 Bot running...")
+    logger.info("🤖 Bot is up and running – press Ctrl+C to stop")
     application.run_polling()
 
 
