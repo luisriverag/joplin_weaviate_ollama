@@ -1,77 +1,124 @@
 # JOPLIN PRIVATE AI
-## RAG Your Notes Locally Using Open Source Models
 
-*(Joplin Notes to Weaviate Ollama RAG pipeline with optional Telegram client)*
+**RAG your notes locally with 100% open‑source stack**
 
----
+## What is it?
 
+Pipeline that syncs Joplin‑exported Markdown/PDF/images into a local Weaviate vector DB, embeds with Sentence‑Transformers, and lets you chat with them using Ollama. Optional Telegram bot provided.
 
-This program syncs your Joplin notes and resources into Weaviate,
-embeds them with SentenceTransformers, and lets you query them via
-LangChain + Ollama
+## Highlights
 
-It has 2 interfaces
-- Console  (which you can SSH into, even if you need a VPN or a reverse tunnel on 
-a relay server)
-- Telegram bot (which kind of defeats the local only approach given Telegram
-will receive a copy of all your conversations, but is useful for testing until 
-we replace it with something better)
+- ⚡ **Fast multithreaded scan & OCR** — uses all CPU cores
+    
+- 🕒 **Content‑hash caching** — uploads only new/changed files
+    
+- 🔍 **Per‑image OCR timeout** — hung files can’t block a sync (`--timeout`)
+    
+- 📊 **Progress bars** — see what’s happening with `--progress`
+    
+- 🧠 **Generic RAG stack** — LangChain + Ollama + Weaviate
+    
+- 🗂️ **Built‑in document classifier** — prioritises personal docs when answering
+    
+- 🐞 **Debug tools** — inspect retrieved docs or save a JSON classification config
+    
+- 📱 **Optional Telegram bot** — restricted to a single user ID
+    
+- 🔧 **Fully configurable via** `.env`
+    
 
-We recommend using it against an MD export of your notes, not the folder where
-you store originals.
+## Quick start
 
-Features
---------
-- ✅ Sync only changed files (Markdown, PDF, images with OCR)
-- ✅ Embedding via HuggingFace sentence-transformers
-- ✅ Vector storage in Weaviate
-- ✅ RAG pipeline using LangChain + Ollama
-- ✅ Telegram bot for private mobile access
-- ✅ Configurable via `.env`
+```
+# 1. Clone & install
+git clone https://github.com/you/joplin-private-ai.git
+cd joplin-private-ai
+python -m pip install -r requirements.txt
 
-Setup
------
-1. Clone this repo and install Python packages:
-   pip install -r requirements.txt
+# 2. System deps
+# Ubuntu:
+sudo apt install tesseract-ocr
+# macOS (brew) / Windows → see Tesseract docs
 
-2. Install system dependencies:
-   - Tesseract OCR:
-     - Ubuntu:   sudo apt install tesseract-ocr
-     - macOS:    brew install tesseract
-     - Windows:  https://github.com/tesseract-ocr/tesseract/wiki
-   - Ollama:    https://ollama.com/download
+# Ollama & Docker (Weaviate)
+# https://ollama.com/download
+docker compose up -d      # starts Weaviate on :8080
 
-3. Start Weaviate locally:
-   docker-compose up -d
+# 3. Configure
+cp sample.env .env
+nano .env                 # point MD_FOLDERS at your Joplin MD export
+```
 
-4. Create `.env`:
-   cp sample.env .env
+## Sync & upload
 
-5. Edit .env with your folder locations...
+```
+# full run, 8 threads, progress bars
+python joplin_sync.py --sync --upload --workers 8 --progress
+# custom OCR timeout and 500‑note batches
+python joplin_sync.py --sync --upload --timeout 30 --batch-size 500
+```
 
-Usage
------
-1. Sync & Upload Notes:
-   ./sync_and_upload.sh
+## Chat locally
 
-2. Ask Questions Locally (Ollama RAG):
-   python3 rag_query.py
-   > What is my motorbike's license plate?
+```
+python rag_query.py
+🧠 > What is my motorbike's license plate?
+```
 
-3. Telegram Bot:
-   python3 telegram_rag_bot.py
-   # On Telegram
-   > /start
-   > What is my motorbikes's license plate?
+### CLI tricks
 
-Bot is restricted to AUTHORIZED_USER_ID from `.env`.
+- `debug:<query>` – show top retrieved docs with classifications
+    
+- `no-analysis:<query>` – skip ownership analysis
+    
+- `save-config my_config.json` – write current classifier template
+    
 
-Files
------
-- joplin_sync.py        — Sync + upload tool
-- rag_query.py          — Local CLI RAG chat with Ollama
-- telegram_rag_bot.py   — Telegram chat bot
-- sync_and_upload.sh    — Helper script to run sync+upload
-- docker-compose.yml    — Weaviate docker
-- requirements.txt      — Python dependencies
-- .env                  — Config for folders, models, and bot
+## Telegram bot (optional)
+
+```
+python telegram_rag_bot.py
+# then on Telegram
+/start
+> What is my motorbike's license plate?
+```
+
+Bot replies only to the `TELEGRAM_USER_ID` set in `.env`.
+
+## File overview
+
+| File | Purpose |
+| --- | --- |
+| `joplin_sync.py` | Multithreaded sync/embedding/upload tool |
+| `rag_query.py` | Local interactive RAG CLI with classifier & debug |
+| `telegram_rag_bot.py` | Single‑user Telegram interface |
+| `sync_and_upload.sh` | Convenience wrapper (legacy) |
+| `docker-compose.yml` | Weaviate stack |
+| `sample.env` / `.env` | Runtime configuration |
+| `note_cache.json` | Auto‑generated dedup cache |
+
+## Environment variables
+
+Important keys (see `.env` for full list):
+
+```
+MD_FOLDERS=/path/to/joplin_export1,/path/to/second/folder
+WEAVIATE_URL=http://localhost:8080
+WEAVIATE_INDEX=JoplinNotes
+EMBEDDING_MODEL=sentence-transformers/all-MiniLM-L6-v2
+OLLAMA_MODEL=llama3:8b
+TELEGRAM_BOT_TOKEN=...
+TELEGRAM_USER_ID=123456789
+```
+
+## FAQ
+
+**Why not point at my live Joplin profile?** A clean Markdown export avoids syncing in‑progress changes and keeps your original notebooks safe.
+
+**Is everything local?** Yes – unless you enable the Telegram bot, which naturally sends your queries and model answers through Telegram’s servers.
+
+**Can I use another model/database?** Sure. Swap `EMBEDDING_MODEL`, `OLLAMA_MODEL`, or plug in a remote Weaviate URL.
+
+## NEXT STEPS
+
+Looking into Element / Matrix.org to replace Telegram with an open source platform that allows bots and end to end encryption.
