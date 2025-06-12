@@ -1,23 +1,5 @@
 #!/usr/bin/env python3
-"""
-Synchronise Joplin-exported notes/resources into a Weaviate v4 index — now with
-multithreaded I/O, optional progress bars, single-pass OCR via content-hash
-Dedup **and a per-image timeout so pathological files can't stall the run**.
 
-Key changes (v2025-06-11):
-──────────────────────────
-* Progress bar now advances with each finished future, so it never appears
-  frozen while a long OCR task runs.
-* `extract_image_text()` enforces a 30-second timeout on Tesseract; hung or
-  super-large images fall back to empty string and log an error.
-* `--timeout` CLI flag lets you adjust that limit.
-
-Usage examples
-──────────────
-    python joplin_sync_multithread.py --sync --upload --workers 8 --progress
-    # allow max 10 s per image
-    python joplin_sync_multithread.py --sync --timeout 10 --progress
-"""
 from __future__ import annotations
 
 import os, json, argparse, logging, warnings, hashlib, concurrent.futures as cf

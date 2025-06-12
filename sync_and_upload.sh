@@ -5,8 +5,5 @@ set -a
 source .env
 set +a
 
-echo "🔄 Syncing Joplin notes..."
-python3 joplin_sync.py --sync
-
-echo "📤 Uploading to Weaviate..."
-python3 joplin_sync.py --upload
+echo "🔄 Syncing Joplin notes + 📤 Uploading to Weaviate"
+python3 joplin_sync.py --sync --upload --workers 8  --batch-size 500 --progress 
