@@ -43,7 +43,7 @@ Joplin Export │  Markdown / Attachments / Resources        │
                                   ▲
                                   │
     ┌───────────────┬─────────────┴───────────────┐
-    │ Terminal CLI  │  Telegram (opt.)   │  REST API† (todo)
+    │ Terminal CLI  │  Telegram (opt.)   │  Element / Matrix (WIP)
     └───────────────┴─────────────┬───────────────┘
                               Conversation
 ```
