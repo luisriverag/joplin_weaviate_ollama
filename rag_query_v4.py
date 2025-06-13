@@ -1,23 +1,4 @@
 #!/usr/bin/env python3
-"""
-Enhanced RAG query system with advanced features and bilingual (English-Spanish) support:
-- Multi-modal retrieval (hybrid search, filters, temporal)
-- Context-aware chunking and re-ranking
-- Query expansion and intent detection (EN/ES)
-- Conversation memory and follow-up handling
-- Advanced document classification and metadata enrichment (EN/ES)
-- Response quality assessment and feedback loops
-
-Improvements (2025-06-13):
-- Externalized configuration to YAML with schema validation
-- Added retry logic for external services
-- Cached regex compilation and document classification
-- Integrated zero-shot intent detection with regex fallback
-- Added document chunking with overlap
-- Implemented structured logging with performance metrics
-- Modularized language patterns for extensibility
-"""
-
 import os
 import json
 import re
