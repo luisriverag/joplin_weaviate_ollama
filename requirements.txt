@@ -23,4 +23,13 @@ langchain-ollama
 # Compatibility
 pydantic<3
 
+bs4
+
 python-telegram-bot
+
+tqdm
+
+
+#element matrix
+matrix-nio
+
