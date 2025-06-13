@@ -4,43 +4,6 @@
 
 * * *
 
-## 📚 Table of Contents
-
-1.  [Project vision](https://chatgpt.com/c/684c5fde-a0c8-8006-b168-98b5f59500a0#project-vision)
-    
-2.  [Architecture](https://chatgpt.com/c/684c5fde-a0c8-8006-b168-98b5f59500a0#architecture)
-    
-3.  [Component deep‑dive](https://chatgpt.com/c/684c5fde-a0c8-8006-b168-98b5f59500a0#component-deep-dive)
-    
-4.  [Requirements](https://chatgpt.com/c/684c5fde-a0c8-8006-b168-98b5f59500a0#requirements)
-    
-5.  [Installation](https://chatgpt.com/c/684c5fde-a0c8-8006-b168-98b5f59500a0#installation)
-    
-6.  [Configuration](https://chatgpt.com/c/684c5fde-a0c8-8006-b168-98b5f59500a0#configuration)
-    
-7.  [Running Weaviate & Ollama](https://chatgpt.com/c/684c5fde-a0c8-8006-b168-98b5f59500a0#running-weaviate--ollama)
-    
-8.  [Synchronising notes](https://chatgpt.com/c/684c5fde-a0c8-8006-b168-98b5f59500a0#synchronising-notes)
-    
-9.  [Chatting with the CLIs](https://chatgpt.com/c/684c5fde-a0c8-8006-b168-98b5f59500a0#chatting-with-the-clis)
-    
-10. [Telegram bot](https://chatgpt.com/c/684c5fde-a0c8-8006-b168-98b5f59500a0#telegram-bot)
-    
-11. [Maintenance & troubleshooting](https://chatgpt.com/c/684c5fde-a0c8-8006-b168-98b5f59500a0#maintenance--troubleshooting)
-    
-12. [Performance tuning](https://chatgpt.com/c/684c5fde-a0c8-8006-b168-98b5f59500a0#performance-tuning)
-    
-13. [Security & privacy](https://chatgpt.com/c/684c5fde-a0c8-8006-b168-98b5f59500a0#security--privacy)
-    
-14. [Extending & hacking](https://chatgpt.com/c/684c5fde-a0c8-8006-b168-98b5f59500a0#extending--hacking)
-    
-15. [FAQ](https://chatgpt.com/c/684c5fde-a0c8-8006-b168-98b5f59500a0#faq)
-    
-16. [License](https://chatgpt.com/c/684c5fde-a0c8-8006-b168-98b5f59500a0#license)
-    
-
-* * *
-
 ## Project vision
 
 Replace cloud Retrieval‑Augmented‑Generation services with a **100 % local stack**:
@@ -276,7 +239,7 @@ python rag_query-fast.py --config patterns.yaml
 
 * * *
 
-## Telegram bot
+## Telegram bot / Element Matrix.org bot
 
 ```bash
 python telegram_rag_bot.py &
@@ -292,6 +255,8 @@ python telegram_rag_bot.py &
 *Security note:* The bot rejects messages from any ID except the whitelisted one.
 
 Note: ragbot_elementmatrix.py is untested, pull requests welcome
+
+
 
 * * *
 
