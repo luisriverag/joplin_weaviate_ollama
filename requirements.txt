@@ -1,6 +1,10 @@
 # Environment
 python-dotenv
 
+# Nice
+structlog
+tqdm
+
 # OCR & Image
 pytesseract
 pillow
@@ -24,11 +28,9 @@ langchain-ollama
 # Compatibility
 pydantic<3
 
-#progress bar
-tqdm
-
 #telegram client (optional)
 python-telegram-bot
 
 #element matrix client (optional)
 matrix-nio
+

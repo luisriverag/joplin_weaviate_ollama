@@ -1,169 +1,360 @@
-# JOPLIN + WEAVIATE + OLLAMA = JOPLIN PRIVATEAI
+# JOPLIN + WEAVIATE + OLLAMA = **Joplin PrivateAI**
 
-**RAG your notes locally with 100% open‑source stack**
+**💡 100 % local, privacy‑first Knowledge Base** — Chat with your Joplin vault **offline** and **under your full control**.
 
-## What is it?
+* * *
 
-Pipeline that syncs Joplin‑exported Markdown/PDF/images into a local Weaviate vector DB, embeds with Sentence‑Transformers, and lets you chat with them using Ollama. Optional Telegram bot provided.
+## 📚 Table of Contents
 
-## Highlights
+1.  [Project vision](https://chatgpt.com/c/684c5fde-a0c8-8006-b168-98b5f59500a0#project-vision)
+    
+2.  [Architecture](https://chatgpt.com/c/684c5fde-a0c8-8006-b168-98b5f59500a0#architecture)
+    
+3.  [Component deep‑dive](https://chatgpt.com/c/684c5fde-a0c8-8006-b168-98b5f59500a0#component-deep-dive)
+    
+4.  [Requirements](https://chatgpt.com/c/684c5fde-a0c8-8006-b168-98b5f59500a0#requirements)
+    
+5.  [Installation](https://chatgpt.com/c/684c5fde-a0c8-8006-b168-98b5f59500a0#installation)
+    
+6.  [Configuration](https://chatgpt.com/c/684c5fde-a0c8-8006-b168-98b5f59500a0#configuration)
+    
+7.  [Running Weaviate & Ollama](https://chatgpt.com/c/684c5fde-a0c8-8006-b168-98b5f59500a0#running-weaviate--ollama)
+    
+8.  [Synchronising notes](https://chatgpt.com/c/684c5fde-a0c8-8006-b168-98b5f59500a0#synchronising-notes)
+    
+9.  [Chatting with the CLIs](https://chatgpt.com/c/684c5fde-a0c8-8006-b168-98b5f59500a0#chatting-with-the-clis)
+    
+10. [Telegram bot](https://chatgpt.com/c/684c5fde-a0c8-8006-b168-98b5f59500a0#telegram-bot)
+    
+11. [Maintenance & troubleshooting](https://chatgpt.com/c/684c5fde-a0c8-8006-b168-98b5f59500a0#maintenance--troubleshooting)
+    
+12. [Performance tuning](https://chatgpt.com/c/684c5fde-a0c8-8006-b168-98b5f59500a0#performance-tuning)
+    
+13. [Security & privacy](https://chatgpt.com/c/684c5fde-a0c8-8006-b168-98b5f59500a0#security--privacy)
+    
+14. [Extending & hacking](https://chatgpt.com/c/684c5fde-a0c8-8006-b168-98b5f59500a0#extending--hacking)
+    
+15. [FAQ](https://chatgpt.com/c/684c5fde-a0c8-8006-b168-98b5f59500a0#faq)
+    
+16. [License](https://chatgpt.com/c/684c5fde-a0c8-8006-b168-98b5f59500a0#license)
+    
 
-- ⚡ **Fast multithreaded scan & OCR** — uses all CPU cores
+* * *
+
+## Project vision
+
+Replace cloud Retrieval‑Augmented‑Generation services with a **100 % local stack**:
+
+- **No vendor lock‑in** – all components are open‑source, containerised, and easily swappable.
     
-- 🕒 **Content‑hash caching** — uploads only new/changed files
+- **Respect your data** – nothing leaves your machine unless *you* enable the optional Telegram bridge.
     
-- 🔍 **Per‑image OCR timeout** — hung files can't block a sync (`--timeout`)
+- **Optimised for commodity hardware** – runs smoothly on an 8 GB RAM laptop, scales down to a Raspberry Pi 4 (via *fast* CLI) and up to a GPU workstation.
     
-- 📊 **Progress bars** — see what's happening with `--progress`
-    
-- 🧪 **Test mode** — scan only first N files for quick testing (`--test 100`)
-    
-- 🧠 **Generic RAG stack** — LangChain + Ollama + Weaviate
-    
-- 🗂️ **Built‑in document classifier** — prioritises personal docs when answering
-    
-- 🐞 **Debug tools** — inspect retrieved docs or save a JSON classification config
-    
-- 📱 **Optional Telegram bot** — restricted to a single user ID
-    
-- 🔧 **Fully configurable via** `.env`
+- **Transparent plumbing** – plain Python, Docker, and YAML; every step is auditable.
     
 
-## Quick start
+* * *
 
-```bash
-# 1. Clone & install
-git clone https://github.com/you/joplin-private-ai.git
-cd joplin-private-ai
-python -m pip install -r requirements.txt
+## Architecture
 
-# 2. System deps
-# Ubuntu:
-sudo apt install tesseract-ocr
-# macOS (brew) / Windows → see Tesseract docs
-
-# Ollama & Docker (Weaviate)
-# https://ollama.com/download
-docker compose up -d      # starts Weaviate on :8080
-
-# 3. Configure
-cp sample.env .env
-nano .env                 # point MD_FOLDERS at your Joplin MD export
+```text
+              ┌─────────────── ① ingestion ────────────────┐
+Joplin Export │  Markdown / Attachments / Resources        │
+              │           `joplin_sync.py`                 │
+              └───────────────────┬────────────────────────┘
+                                  │  batches of chunks
+                                  ▼
+                        ┌───────────────────────┐
+                        │      Weaviate         │  ② retrieval
+                        │  (BM25 + vectors)     │<──────────────┐
+                        └───────────────────────┘               │
+                                  ▲                             │
+                                  │ GraphQL                     │
+                                  │ ③ context                  │
+                                  ▼                             │
+                        ┌───────────────────────┐               │
+                        │       Ollama          │  ④ answer     │
+                        │ (local LLM/adapter)   │───────────────┘
+                        └───────────────────────┘
+                                  ▲
+                                  │
+    ┌───────────────┬─────────────┴───────────────┐
+    │ Terminal CLI  │  Telegram (opt.)   │  REST API† (todo)
+    └───────────────┴─────────────┬───────────────┘
+                              Conversation
 ```
 
-## Sync & upload
+*(† a minimal Flask gateway is planned for v2025‑Q3.)*
 
-```bash
-# Test run with first 100 files (recommended for first setup)
-python joplin_sync.py --sync --upload --test 100 --progress
+### Data flow
 
-# Full run, 8 threads, progress bars
-python joplin_sync.py --sync --upload --workers 8 --progress
+1.  **Ingestion** – `joplin_sync.py` scans export folders, slices Markdown into ~500 token chunks, OCRs images/PDFs, computes embeddings (dimension 384), and uploads JSON batches.
+    
+2.  **Storage** – Chunks live in Weaviate with original note path, resource hash, timestamps, and tag list.
+    
+3.  **Retrieval** – CLIs perform hybrid search (BM25 + cosine) with a configurable α blend, rerank hits with recency & ownership heuristics, and craft the final prompt.
+    
+4.  **Generation** – A local Ollama model (e.g. *llama3:8b‑instruct*) produces the answer, including citations back to note source paths.
+    
 
-# Custom OCR timeout and 500‑note batches
-python joplin_sync.py --sync --upload --timeout 30 --batch-size 500
-```
+* * *
 
-### Sync options
+## Component deep‑dive
 
-| Option | Description | Example |
+| Name | Highlights | Language / deps |
 | --- | --- | --- |
-| `--sync` | Scan note folders for files | Required |
-| `--upload` | Push to Weaviate | Usually combined with `--sync` |
-| `--test N` | **Test mode**: Only scan first N files | `--test 50` |
-| `--workers N` | Threading (default: CPU count) | `--workers 8` |
-| `--progress` | Show progress bars | Recommended |
-| `--timeout N` | OCR timeout per image (seconds) | `--timeout 30` |
-| `--batch-size N` | Notes per upload batch | `--batch-size 500` |
-| `--index NAME` | Weaviate collection name | `--index MyNotes` |
+| **`joplin_sync.py`** | Multithreaded crawler (I/O bound) • OCR via Tesseract • Incremental cache keyed by SHA‑256 • Automatic language detection for OCR • Hybrid schema bootstrapper • Search playground (`--search`) | Python 3.10, Tesseract ≥ 5.0 |
+| **`rag_query.py`** | Intent classifier (EN/ES) • Sliding‑window memory (8 turns) • Ownership/procedural/temporal stages • Structured logs (`structlog`) • Rich colour console | Python 3.10, LangChain 0.2, Ollama |
+| **`rag_query-fast.py`** | ≤ 2 s cold start • No memory, direct retrieval • YAML pattern matcher • Ideal for Raspberry Pi | Same |
+| **`docker-compose.yml`** | Read‑only Weaviate vectorizer • Single‑node Raft with persistent shards • Tweaked limits (`QUERY_DEFAULTS_LIMIT=25`) | Docker ≥ 20.10 |
+| `telegram_rag_bot.py` | One‑user hard‑locked • Markdown rendering • `/summary`, `/reset` commands | python‑telegram‑bot 21 |
+| `sync_and_upload.sh` | CRON‑friendly wrapper for delta sync & upload | Bash |
+| `scripts/migrations/` | Future schema migrations (placeholder) | Python |
 
-## Chat locally
+* * *
+
+## Requirements
+
+| Category | Minimum | Recommended | Notes |
+| --- | --- | --- | --- |
+| **OS** | Linux x86‑64 / ARM 64, macOS, Windows 11 WSL2 | Ubuntu 22.04 LTS | On macOS, macFUSE may boost FS perf |
+| **Python** | 3.9 | 3.10 | Tested with CPython |
+| **CPU** | 2 cores | 4‑8 cores | Heavy OCR benefits |
+| **RAM** | 4 GB | 8‑16 GB | Embeddings cached in RAM |
+| **Storage** | 5 GB | 20 GB+ | Weaviate grows with vault size |
+| **GPU** | optional | 8 GB VRAM | Accelerates Ollama (CUDA / Metal) |
+| **Tesseract** | 5.0 | 5.3 + `tesseract-lang` | Add `eng`, `spa`, `deu`, … |
+
+* * *
+
+## Installation
+
+### 1 · Clone & Python packages
+
+```bash
+git clone https://github.com/luisriverag/joplin_weaviate_ollama/.git
+cd joplin_weaviate_ollama
+python -m venv .venv
+source .venv/bin/activate   # Windows → .venv\Scripts\activate
+pip install --upgrade pip
+pip install -r requirements.txt
+```
+
+### 2 · System packages
+
+- **Debian/Ubuntu**
+    
+    ```bash
+    sudo apt update
+    sudo apt install tesseract-ocr libtesseract-dev poppler-utils
+    sudo apt install tesseract-ocr-eng tesseract-ocr-spa  # language packs
+    ```
+    
+- **Arch**
+    
+    ```bash
+    sudo pacman -S tesseract tesseract-data-eng tesseract-data-spa
+    ```
+    
+- **macOS (Homebrew)**
+    
+    ```bash
+    brew install tesseract poppler
+    brew install tesseract-lang   # add packs as needed
+    ```
+    
+- **Windows**
+    
+    1.  Install Tesseract and add to `PATH`.
+        
+    2.  WSL2 users: run Weaviate inside WSL or in a Docker Desktop Linux container.
+        
+
+### 3 · Optional GPU acceleration
+
+Install CUDA 12 + cuDNN 8 or Apple Metal plugins → restart Ollama. `ollama pull llama3:8b` will auto‑detect GPU and quantise accordingly.
+
+* * *
+
+## Configuration
+
+Copy `.env` and tweak:
+
+```bash
+cp sample.env .env
+nano .env
+```
+
+| Var | Default | Description |
+| --- | --- | --- |
+| `MD_FOLDERS` | –   | Comma‑separated paths to Joplin exports (`.md` + `_resources`) |
+| `WEAVIATE_URL` | `http://localhost:8080` | Use `https://` behind a reverse proxy |
+| `WEAVIATE_INDEX` | `Documents` | Each export profile can map to a unique index |
+| `EMBEDDING_MODEL` | `sentence-transformers/all-MiniLM-L6-v2` | 384‑dim embeddings |
+| `OLLAMA_MODEL` | `llama3:8b` | Any Ollama label works (`mistral:7b-instruct`, …) |
+| `TELEGRAM_BOT_TOKEN` | *(unset)* | Enable bot when set |
+| `TELEGRAM_USER_ID` | *(unset)* | Numeric ID accepted by the bot |
+| `TZ` | `UTC` | Affects temporal boosts; set to your timezone |
+| `LOG_LEVEL` | `INFO` | `DEBUG` prints request bodies & queries |
+
+* * *
+
+## Running Weaviate & Ollama
+
+### 1 · Boot vector DB
+
+```bash
+docker compose up -d
+# wait for readiness
+until docker compose logs --tail 5 weaviate | grep -q "Startup complete"; do sleep 2; done
+```
+
+### 2 · Start local LLM
+
+```bash
+ollama serve &
+ollama pull llama3:8b   # first time only
+```
+
+*Tip:* Put `ollama serve` in a systemd user service for autostart.
+
+* * *
+
+## Synchronising notes
+
+### Common recipes
+
+| Goal | Command |
+| --- | --- |
+| Smoke test (100 notes) | `python joplin_sync.py --sync --upload --test 100 --progress` |
+| Full sync (all CPUs) | `python joplin_sync.py --sync --upload --workers $(nproc) --progress` |
+| Incremental delta (CRON) | `./sync_and_upload.sh` |
+| Re‑OCR only (skip upload) | `python joplin_sync.py --sync --workers 4 --no-upload` |
+| Ad‑hoc hybrid search | `python joplin_sync.py --search "license plate" --alpha 0.7 --top-k 5` |
+
+### Flag reference (excerpt)
+
+| Flag | Meaning |
+| --- | --- |
+| `--workers N` | Threads for OCR/embeddings (default = CPU count) |
+| `--batch-size N` | Upload batch size (notes) |
+| `--index NAME` | Override target Weaviate class |
+| `--timeout N` | Per‑image OCR timeout (sec) |
+| `--alpha 0‑1` | Weight of vector vs BM25 for hybrid search |
+| `--cache-info` | Print cache statistics |
+| `--clean-cache [--force]` | Remove orphaned cache entries |
+
+* * *
+
+## Chatting with the CLIs
+
+### Enhanced CLI (`rag_query.py`)
 
 ```bash
 python rag_query.py
-🧠 > What is my motorbike's license plate?
+🧠 > ¿Tengo la factura de la lavadora?
 ```
 
-### CLI tricks
+| Shortcut | Effect |
+| --- | --- |
+| `debug:<query>` | Show top docs, classification, scores |
+| `no-analysis:<query>` | Skip ownership / procedural heuristics |
+| `summary` | 3‑line recap of conversation memory |
+| `reset` | Clear memory buffer |
+| `help` | Quick in‑CLI cheat sheet |
 
-- `debug:<query>` – show top retrieved docs with classifications
-    
-- `no-analysis:<query>` – skip ownership analysis
-    
-- `save-config my_config.json` – write current classifier template
-    
+### Lightweight CLI (`rag_query-fast.py`)
 
-## Telegram bot (optional)
+Ideal for constrained hardware; same usage minus memory & reranking:
 
 ```bash
-python telegram_rag_bot.py
-# then on Telegram
-/start
-> What is my motorbike's license plate?
+python rag_query-fast.py --config patterns.yaml
 ```
 
-Bot replies only to the `TELEGRAM_USER_ID` set in `.env`.
+*Hot‑reload config:* `:reload` inside CLI re‑reads the YAML without restart.
 
-## File overview
+* * *
 
-| File | Purpose |
-| --- | --- |
-| `joplin_sync.py` | Multithreaded sync/embedding/upload tool |
-| `rag_query.py` | Local interactive RAG CLI with classifier & debug |
-| `telegram_rag_bot.py` | Single‑user Telegram interface |
-| `sync_and_upload.sh` | Convenience wrapper script |
-| `docker-compose.yml` | Weaviate stack |
-| `sample.env` / `.env` | Runtime configuration |
-| `note_cache.json` | Auto‑generated dedup cache |
+## Telegram bot
 
-## Environment variables
-
-Important keys (see `.env` for full list):
-
-```env
-MD_FOLDERS=/path/to/joplin_export1,/path/to/second/folder
-WEAVIATE_URL=http://localhost:8080
-WEAVIATE_INDEX=Documents
-EMBEDDING_MODEL=sentence-transformers/all-MiniLM-L6-v2
-OLLAMA_MODEL=llama3:8b
-TELEGRAM_BOT_TOKEN=...
-TELEGRAM_USER_ID=123456789
+```bash
+python telegram_rag_bot.py &
 ```
 
-## Recommended workflow
+1.  Set `TELEGRAM_BOT_TOKEN` and `TELEGRAM_USER_ID` in `.env`.
+    
+2.  Send `/start` to your bot.
+    
+3.  Use Markdown or plain text; answers cite note paths like `notebooks/Finanzas/2023-IRPF.md`.
+    
 
-1.  **First-time setup**: Use test mode to verify everything works
+*Security note:* The bot rejects messages from any ID except the whitelisted one.
+
+Note: ragbot_elementmatrix.py is untested, pull requests welcome
+
+* * *
+
+## Maintenance & troubleshooting
+
+| Symptom | Likely cause | Remedy |
+| --- | --- | --- |
+| `Connection refused` to Weaviate | Container not ready | `docker compose logs -f weaviate` |
+| "Phantom shard" error | Dirty shutdown | Add `RAFT_ENABLE_ONE_NODE_RECOVERY: true`, restart once |
+| OCR stalls on TIFF | Bad scan | Lower `--timeout`; file skipped & logged |
+| Answers too generic | Using *fast* CLI | Switch to full CLI or enlarge `top-k` |
+| Model OOM on GPU | VRAM too small | Pull 4‑bit quant (`llama3:8b-q4_0`) or use CPU |
+
+Logs:
+
+- `sync_errors.log` – ingestion issues
     
-    ```bash
-    python joplin_sync.py --sync --upload --test 100 --progress
-    ```
+- `~/.ollama/logs` – LLM server
     
-2.  **Full sync**: Once confirmed working, run without test limit
+- `weaviate-data/logs` – DB warnings
     
-    ```bash
-    python joplin_sync.py --sync --upload --workers 8 --progress
-    ```
+
+* * *
+
+## Performance tuning
+
+| Lever | Default | Faster | Notes |
+| --- | --- | --- | --- |
+| **Embeddings model** | MiniLM‑L6‑v2 | all‑mpnet‑base‑v2 (768 dim) | Higher recall, slower |
+| **Batch size** | 32 notes | 128 | RAM bound |
+| **OCR lang packs** | eng + spa | exact language subset | Fewer dictionaries = faster |
+| **`--alpha`** | 0.7 | 0.5 (vector‑heavy) | Lower → BM25 heavier |
+| **LLM quant** | q4_0 | q2_K | Lower VRAM, slower |
+| **Weaviate cache** | off | `search.cache` plug‑in | Enterprise feature |
+
+* * *
+
+## Security & privacy
+
+- **Network isolation** – Weaviate listens on `localhost` by default. Use firewall rules or Docker network to restrict.
     
-3.  **Regular updates**: The cache system ensures only new/changed files are processed
+- **Encrypted volume** – Store `weaviate-data/` on an encrypted partition if note content is sensitive.
     
-    ```bash
-    # Use your convenience script
-    ./sync_and_upload.sh
-    ```
+- **No telemetry** – `ENABLE_TELEMETRY=false` in compose file.
     
+- **Telegram bridge** – Remember all traffic goes through Telegram’s servers; dont run the telegram ragbot if strict privacy is required.
+    
+
+* * *
 
 ## FAQ
 
-**Why not point at my live Joplin profile?** A clean Markdown export avoids syncing in‑progress changes and keeps your original notebooks safe.
+- **Why two CLIs?** — `rag_query.py` aims for maximal context awareness; `rag_query-fast.py` boots in seconds, fitting IoT / Pi devices.
+    
+- **Does any data leave my machine?** — No, unless *you* enable the Telegram bot or point `WEAVIATE_URL` to a remote host.
+    
+- **How do I wipe and rebuild the index?** — `docker compose down -v` to drop shards, delete `note_cache.json`, then run a fresh sync.
+    
+- **Can I disable OCR?** — Yes: `--no-ocr` skips image/PDF text extraction.
+    
 
-**Is everything local?** Yes – unless you enable the Telegram bot, which naturally sends your queries and model answers through Telegram's servers.
+* * *
 
-**Can I use another model/database?** Sure. Swap `EMBEDDING_MODEL`, `OLLAMA_MODEL`, or plug in a remote Weaviate URL.
+## License
 
-**What's the test mode for?** Perfect for initial setup or testing changes. Instead of scanning all 50k+ files, `--test 100` only processes the first 100 files, giving you quick feedback on whether your configuration works.
-
-**How do I know if my sync worked?** Check the output for:
-
-- `✅ Created collection 'Documents' with schema` (first run)
-- `🔄 X new/changed notes detected`
-- `✅ Upload complete. Y chunks across Z notes`
+MIT
