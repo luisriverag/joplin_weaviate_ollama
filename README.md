@@ -1,4 +1,4 @@
-# JOPLIN PRIVATE AI
+# JOPLIN + WEAVIATE + OLLAMA = JOPLIN PRIVATEAI
 
 **RAG your notes locally with 100% open‑source stack**
 

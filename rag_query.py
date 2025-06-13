@@ -1,4 +1,9 @@
 #!/usr/bin/env python3
+"""
+Generic RAG query system with configurable document classification for any domain.
+Supports custom document types, patterns, and classification rules.
+"""
+
 import os
 import json
 from urllib.parse import urlparse
@@ -200,28 +205,30 @@ def make_weaviate_client(url: str) -> weaviate.WeaviateClient:
             additional_config=AdditionalConfig(timeout=Timeout(init=5))
         )
 
-# Generic prompt template
+# Generic prompt template 
 GENERIC_PROMPT = PromptTemplate(
     input_variables=["context", "question"],
-    template="""You are an AI assistant helping someone search through their personal knowledge base.
+    template="""You are an AI assistant helping someone search their personal knowledge base.
 
-The context below contains different types of documents that have been classified by priority:
-- HIGH PRIORITY: Personal documents, records, and evidence of ownership
-- MEDIUM PRIORITY: Reference materials, manuals, and specifications  
-- LOW PRIORITY: General articles, notes, and other content
+Documents come in three loose priority bands:
+- HIGH  : Personal records, receipts, ownership evidence
+- MEDIUM: Manuals, reference specs, how-to guides
+- LOW   : General notes, articles, miscellaneous content
 
-When answering questions, prioritize information from higher priority documents, especially for questions about ownership, personal records, or specific items the user might have.
+Some chunks include extra metadata (e.g. folder path or tags).  
+Feel free to quote it when it genuinely helps the user locate or trust the information, but it is never required.
 
-Context from knowledge base:
+Context:
 {context}
 
 Question: {question}
 
 Instructions:
-1. Look for personal documents and records first
-2. Use reference materials to provide additional context
-3. Clearly distinguish between what the user owns/has vs. general information
-4. Be specific about the evidence you found
+1. Prefer higher-priority documents when they answer the question.
+2. Use reference materials to add detail or background.
+3. Mention metadata such as folder or tags only when it adds clarity.
+4. Distinguish clearly between what the user owns/has and general facts.
+5. Cite specific evidence you found.
 
 Answer:"""
 )

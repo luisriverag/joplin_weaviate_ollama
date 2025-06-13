@@ -8,6 +8,7 @@ pillow
 # PDF & HTML parsing
 pypdf
 PyMuPDF
+bs4
 
 # Vector DB
 weaviate-client>=4.0.0    # v4 client (needs gRPC port open)
@@ -23,13 +24,11 @@ langchain-ollama
 # Compatibility
 pydantic<3
 
-bs4
-
-python-telegram-bot
-
+#progress bar
 tqdm
 
+#telegram client (optional)
+python-telegram-bot
 
-#element matrix
+#element matrix client (optional)
 matrix-nio
-
